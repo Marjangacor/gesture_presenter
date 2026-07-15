@@ -3,7 +3,7 @@
     "detection_confidence": 0.1,
     "activation_hold_seconds": 0.5,
     "cooldown_seconds": 0.1,
-    "swipe_distance_threshold": 0.15,
+    "swipe_distance_threshold": 0.05,
     "hotkeys": {
         "toggle_gesture_control": "f8"
     },

@@ -86,6 +86,8 @@ class AppService(QObject):
         ge.window_switch_exited.connect(self._on_window_switch_exited)
         ge.swipe_right.connect(self._on_swipe_right)
         ge.swipe_left.connect(self._on_swipe_left)
+        ge.swipe_up.connect(self._on_swipe_up)
+        ge.swipe_down.connect(self._on_swipe_down)
         ge.hand_position_changed.connect(self._on_hand_position_changed)
 
     def _on_presentation_entered(self):
@@ -109,6 +111,12 @@ class AppService(QObject):
 
     def _on_swipe_left(self):
         self.keyboard_controller.press_left_arrow()
+
+    def _on_swipe_up(self):
+        self.keyboard_controller.press_up_arrow()
+
+    def _on_swipe_down(self):
+        self.keyboard_controller.press_down_arrow()
 
     def _on_hand_position_changed(self, x, y):
         if self.overlay:

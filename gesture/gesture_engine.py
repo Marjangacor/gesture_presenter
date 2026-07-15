@@ -38,6 +38,8 @@ class GestureEngine(QObject):
     window_switch_exited = Signal()
     swipe_right = Signal()
     swipe_left = Signal()
+    swipe_up = Signal()
+    swipe_down = Signal()
     hand_position_changed = Signal(float, float)  # normalized x, y
 
     def __init__(self, settings, parent=None):
@@ -52,7 +54,8 @@ class GestureEngine(QObject):
         self._fist_hold_start = None
         self._cooldown_until = 0.0
 
-        self._track_start_pos = None
+        self._track_start_x = None
+        self._track_start_y = None
         self._track_start_time = None
 
     def _reload_settings(self):
@@ -99,7 +102,8 @@ class GestureEngine(QObject):
     def _enter_presentation_mode(self):
         self.state = GestureState.PRESENTATION_MODE
         self._palm_hold_start = None
-        self._track_start_pos = None
+        self._track_start_x = None
+        self._track_start_y = None
         self.presentation_mode_entered.emit()
 
     # ---------------------------------------------------------
@@ -107,7 +111,8 @@ class GestureEngine(QObject):
     # ---------------------------------------------------------
     def _handle_presentation_mode(self, landmarks, now):
         if not landmarks:
-            self._track_start_pos = None
+            self._track_start_x = None
+            self._track_start_y = None
             self._fist_hold_start = None
             return
 
@@ -122,12 +127,13 @@ class GestureEngine(QObject):
 
         cx, cy = palm_center(landmarks)
         self.hand_position_changed.emit(cx, cy)
-        self._track_swipe(cx, now, in_presentation_mode=True)
+        self._track_swipe(cx, cy, now, in_presentation_mode=True)
 
     def _enter_window_switch_mode(self):
         self.state = GestureState.WINDOW_SWITCH_MODE
         self._fist_hold_start = None
-        self._track_start_pos = None
+        self._track_start_x = None
+        self._track_start_y = None
         self.window_switch_entered.emit()
 
     # ---------------------------------------------------------
@@ -135,7 +141,8 @@ class GestureEngine(QObject):
     # ---------------------------------------------------------
     def _handle_window_switch_mode(self, landmarks, now):
         if not landmarks:
-            self._track_start_pos = None
+            self._track_start_x = None
+            self._track_start_y = None
             return
 
         if is_open_palm(landmarks):
@@ -143,8 +150,8 @@ class GestureEngine(QObject):
             return
 
         if is_fist(landmarks):
-            cx, _cy = palm_center(landmarks)
-            self._track_swipe(cx, now, in_presentation_mode=False)
+            cx, cy = palm_center(landmarks)
+            self._track_swipe(cx, cy, now, in_presentation_mode=False)
 
     def _exit_window_switch_mode(self):
         self.window_switch_exited.emit()
@@ -153,26 +160,37 @@ class GestureEngine(QObject):
     # ---------------------------------------------------------
     # Swipe tracking (shared by both modes)
     # ---------------------------------------------------------
-    def _track_swipe(self, cx, now, in_presentation_mode: bool):
-        if self._track_start_pos is None:
-            self._track_start_pos = cx
+    def _track_swipe(self, cx, cy, now, in_presentation_mode: bool):
+        if self._track_start_x is None or self._track_start_y is None:
+            self._track_start_x = cx
+            self._track_start_y = cy
             self._track_start_time = now
             return
 
         elapsed = now - self._track_start_time
         if elapsed > SWIPE_WINDOW_SECONDS:
-            self._track_start_pos = cx
+            self._track_start_x = cx
+            self._track_start_y = cy
             self._track_start_time = now
             return
 
-        delta = cx - self._track_start_pos
-        if abs(delta) >= self.swipe_threshold:
-            if delta > 0:
-                self.swipe_right.emit()
-            else:
-                self.swipe_left.emit()
+        delta_x = cx - self._track_start_x
+        delta_y = cy - self._track_start_y
 
-            self._track_start_pos = None
+        if abs(delta_x) >= self.swipe_threshold or abs(delta_y) >= self.swipe_threshold:
+            if abs(delta_x) >= abs(delta_y):
+                if delta_x > 0:
+                    self.swipe_right.emit()
+                else:
+                    self.swipe_left.emit()
+            else:
+                if delta_y > 0:
+                    self.swipe_down.emit()
+                else:
+                    self.swipe_up.emit()
+
+            self._track_start_x = None
+            self._track_start_y = None
             self._track_start_time = None
 
             # Per spec: a swipe in Presentation Mode is followed by cooldown
@@ -190,7 +208,8 @@ class GestureEngine(QObject):
         self.state = GestureState.WAITING_ACTIVATION
         self._palm_hold_start = None
         self._fist_hold_start = None
-        self._track_start_pos = None
+        self._track_start_x = None
+        self._track_start_y = None
 
     def _force_back_to_waiting(self):
         """Used when gesture control is disabled mid-gesture (hotkey off)."""
@@ -202,4 +221,5 @@ class GestureEngine(QObject):
         self.state = GestureState.WAITING_ACTIVATION
         self._palm_hold_start = None
         self._fist_hold_start = None
-        self._track_start_pos = None
+        self._track_start_x = None
+        self._track_start_y = None

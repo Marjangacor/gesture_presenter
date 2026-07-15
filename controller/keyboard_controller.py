@@ -19,6 +19,14 @@ class KeyboardController:
         self._controller.press(Key.left)
         self._controller.release(Key.left)
 
+    def press_up_arrow(self):
+        self._controller.press(Key.up)
+        self._controller.release(Key.up)
+
+    def press_down_arrow(self):
+        self._controller.press(Key.down)
+        self._controller.release(Key.down)
+
     def press_enter(self):
         self._controller.press(Key.enter)
         self._controller.release(Key.enter)
