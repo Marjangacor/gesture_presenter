@@ -1,0 +1,15 @@
+{
+    "camera_index": 0,
+    "detection_confidence": 0.7,
+    "activation_hold_seconds": 1.0,
+    "cooldown_seconds": 1.0,
+    "swipe_distance_threshold": 0.15,
+    "hotkeys": {
+        "toggle_gesture_control": "f8"
+    },
+    "overlay": {
+        "enabled": true,
+        "radius": 20,
+        "opacity": 0.5
+    }
+}
