@@ -216,9 +216,127 @@
             background-color: #4d0000 !important;
             background-image: none !important;
         }
+
+        .wrong-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 8rem;
+            color: #ff0000;
+            text-shadow: 6px 6px 0px #000;
+            font-family: 'Press Start 2P', monospace;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s ease;
+        }
+
+        .wrong-popup.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        /* Layar Hukuman */
+        .punishment-screen {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(100, 0, 0, 0.95);
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 50;
+            padding: 40px;
+        }
+
+        .punishment-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 3rem;
+            color: #ff2a2a;
+            text-shadow: 4px 4px 0px #000;
+            margin-bottom: 20px;
+            animation: pulse 1s infinite alternate;
+        }
+
+        .punishment-subtitle {
+            font-size: 2rem;
+            color: #fff;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        .punishment-subtitle span {
+            color: #ffff00;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .punishment-area {
+            display: flex;
+            gap: 40px;
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 30px;
+        }
+
+        .punishment-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 1.5rem;
+            color: #00ffff;
+        }
+
+        .block-container {
+            width: 100%;
+            min-height: 300px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 4px dashed #ff00ff;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .target-container {
+            border-color: #00ff66;
+            background-color: rgba(0, 50, 0, 0.5);
+        }
+
+        .code-block {
+            background-color: #1a0c36;
+            border: 2px solid #fff;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 1.5rem;
+            color: #00ff66;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000;
+            transition: transform 0.1s;
+        }
+        .code-block:hover {
+            transform: translateY(-2px);
+            border-color: #ffff00;
+        }
+
+        .check-btn {
+            background: #ff2a2a;
+        }
+
+        .punishment-feedback {
+            margin-top: 20px;
+            font-size: 1.5rem;
+            font-family: 'Press Start 2P', monospace;
+            height: 30px;
+        }
     </style>
 </head>
 <body>
+    <div id="wrong-popup" class="wrong-popup">WRONG!</div>
 
     <div class="game-screen">
         
@@ -238,6 +356,9 @@
                 
                 <!-- Petunjuk Perintah -->
                 <div class="instruction-box" id="instruction-text">Jalankan output kode di atas dengan gestur tangan!</div>
+                
+                <!-- Status Berapa kali user sudah melakukan Swipe -->
+                <div class="counter-box" id="counter-text" style="display: none;">PROGRESS: 0 / 1</div>
             </div>
 
             <!-- Space Bawah kosong rapi -->
@@ -251,57 +372,232 @@
             <button class="restart-btn" onclick="resetGame()">CONTINUE?</button>
         </div>
 
+        <!-- AREA PUNISHMENT -->
+        <div class="punishment-screen" id="punishment-contents">
+            <div class="punishment-title">PUNISHMENT TIME!</div>
+            <div class="punishment-subtitle" id="punishment-instruction">Susun kode agar menghasilkan output: <span>Kiri Kanan</span></div>
+            
+            <div class="punishment-area">
+                <div class="punishment-section">
+                    <div>Pilihan Kode (Drag and Drop):</div>
+                    <div class="block-container" id="source-blocks" ondragover="allowDrop(event)" ondrop="drop(event, 'source')">
+                    </div>
+                </div>
+                
+                <div class="punishment-section">
+                    <div>Jawabanmu:</div>
+                    <div class="block-container target-container" id="target-blocks" ondragover="allowDrop(event)" ondrop="drop(event, 'target')">
+                    </div>
+                </div>
+            </div>
+
+            <button class="restart-btn check-btn" onclick="checkPunishment()">CEK JAWABAN</button>
+            <div class="punishment-feedback" id="punishment-feedback"></div>
+        </div>
+
     </div>
 
     <script>
-        // Logika Soal: Total 5 Soal dengan materi Python dasar!
+        // Logika Soal: Total 7 Soal dengan materi Python dasar (Single & Multi-Swipe)!
         const quizData = [
             {
                 code: `<span class="code-keyword">print</span>(<span class="code-string">"Kiri"</span>)`,
-                requiredDirection: "ArrowLeft",
+                requiredSequence: ["ArrowLeft"],
                 hint: "Output: Kiri (Geser Kiri)"
             },
             {
                 code: `<span class="code-keyword">teks</span> = <span class="code-string">"Kanan"</span><br><span class="code-keyword">print</span>(teks)`,
-                requiredDirection: "ArrowRight",
+                requiredSequence: ["ArrowRight"],
                 hint: "Output: Kanan (Geser Kanan)"
             },
             {
                 code: `<span class="code-keyword">if</span> 10 &gt; 5:<br>&nbsp;&nbsp;<span class="code-keyword">print</span>(<span class="code-string">"Kiri"</span>)<br><span class="code-keyword">else</span>:<br>&nbsp;&nbsp;<span class="code-keyword">print</span>(<span class="code-string">"Kanan"</span>)`,
-                requiredDirection: "ArrowLeft",
-                hint: "10 lebih besar dari 5, jadi? (Geser Kiri/Kanan)"
+                requiredSequence: ["ArrowLeft"],
+                hint: "10 lebih besar dari 5, jadi? (Geser Kiri)"
             },
             {
-                code: `<span class="code-keyword">buah</span> = [<span class="code-string">"Apel"</span>, <span class="code-string">"Kanan"</span>]<br><span class="code-keyword">print</span>(buah[1])`,
-                requiredDirection: "ArrowRight",
-                hint: "Indeks 1 pada Python adalah elemen ke-2! (Geser Kiri/Kanan)"
+                code: `<span class="code-keyword">print</span>(<span class="code-string">"Kanan"</span>)<br><span class="code-keyword">print</span>(<span class="code-string">"Kiri"</span>)<br><span class="code-keyword">print</span>(<span class="code-string">"Kiri"</span>)`,
+                requiredSequence: ["ArrowRight", "ArrowLeft", "ArrowLeft"],
+                hint: "Ada 3 baris print! (Kanan 1x, Kiri 2x)"
             },
             {
-                code: `<span class="code-keyword">def</span> <span class="code-string">arah</span>():<br>&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-string">"Kiri"</span><br><br><span class="code-keyword">print</span>(arah())`,
-                requiredDirection: "ArrowLeft",
-                hint: "Fungsi arah() mengembalikan nilai apa? (Geser Kiri/Kanan)"
+                code: `<span class="code-keyword">for</span> i <span class="code-keyword">in</span> <span class="code-keyword">range</span>(2):<br>&nbsp;&nbsp;<span class="code-keyword">print</span>(<span class="code-string">"Kanan"</span>)`,
+                requiredSequence: ["ArrowRight", "ArrowRight"],
+                hint: "Looping 2 kali! (Kanan 2x)"
+            },
+            {
+                code: `<span class="code-keyword">arah</span> = [<span class="code-string">"Kiri"</span>, <span class="code-string">"Kanan"</span>]<br><span class="code-keyword">print</span>(arah[1])<br><span class="code-keyword">print</span>(arah[0])`,
+                requiredSequence: ["ArrowRight", "ArrowLeft"],
+                hint: "Ambil index ke-1 lalu index ke-0 (Kanan 1x, Kiri 1x)"
+            },
+            {
+                code: `<span class="code-keyword">def</span> <span class="code-string">langkah</span>():<br>&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-string">"Kiri"</span><br><br><span class="code-keyword">print</span>(<span class="code-string">"Kanan"</span>)<br><span class="code-keyword">print</span>(langkah())`,
+                requiredSequence: ["ArrowRight", "ArrowLeft"],
+                hint: "Print 'Kanan' lalu fungsi langkah() (Kanan 1x, Kiri 1x)"
             }
         ];
 
         let currentIdx = 0;
         let score = 0;
-        let lives = 6; 
+        let lives = 2; 
+        let currentSequenceStep = 0;
         let isLockingInput = false; 
 
         const quizContents = document.getElementById('quiz-contents');
         const resultContents = document.getElementById('result-contents');
         const codeTextEl = document.getElementById('code-text');
         const instructionTextEl = document.getElementById('instruction-text');
+        const counterTextEl = document.getElementById('counter-text');
         const stageTextEl = document.getElementById('stage-text');
         const heartsBox = document.getElementById('hearts-box');
         const finalScoreEl = document.getElementById('final-score');
         const resultStatusEl = document.getElementById('result-status');
         const quizSlider = document.getElementById('quiz-slider');
+        const wrongPopup = document.getElementById('wrong-popup');
+
+        // Punishment Data & Variables
+        const punishmentData = [
+            {
+                targetOutput: "Kiri",
+                blocks: [
+                    { id: "b1", code: `x = "Kiri"` },
+                    { id: "b2", code: `print(x)` }
+                ],
+                correctOrder: ["b1", "b2"]
+            },
+            {
+                targetOutput: "Kanan Kiri",
+                blocks: [
+                    { id: "b1", code: `print("Kanan")` },
+                    { id: "b2", code: `print("Kiri")` }
+                ],
+                correctOrder: ["b1", "b2"]
+            },
+            {
+                targetOutput: "Kiri Kiri",
+                blocks: [
+                    { id: "b1", code: `for i in range(2):` },
+                    { id: "b2", code: `&nbsp;&nbsp;print("Kiri")` }
+                ],
+                correctOrder: ["b1", "b2"]
+            }
+        ];
+
+        let activePunishment = null;
+        let sourceBlocksArr = [];
+        let targetBlocksArr = [];
+
+        const punishmentContents = document.getElementById('punishment-contents');
+        const punishmentInstructionEl = document.getElementById('punishment-instruction');
+        const sourceBlocksEl = document.getElementById('source-blocks');
+        const targetBlocksEl = document.getElementById('target-blocks');
+        const punishmentFeedbackEl = document.getElementById('punishment-feedback');
+
+        function startPunishment() {
+            quizContents.style.display = 'none';
+            resultContents.style.display = 'none';
+            punishmentContents.style.display = 'flex';
+            
+            const r = Math.floor(Math.random() * punishmentData.length);
+            activePunishment = punishmentData[r];
+            
+            punishmentInstructionEl.innerHTML = `Susun kode agar menghasilkan output: <span>${activePunishment.targetOutput}</span>`;
+            punishmentFeedbackEl.innerText = "";
+            
+            sourceBlocksArr = [...activePunishment.blocks].sort(() => Math.random() - 0.5);
+            targetBlocksArr = [];
+            
+            renderPunishmentBlocks();
+        }
+
+        function renderPunishmentBlocks() {
+            sourceBlocksEl.innerHTML = '';
+            targetBlocksEl.innerHTML = '';
+            
+            sourceBlocksArr.forEach(block => {
+                const el = document.createElement('div');
+                el.className = 'code-block';
+                el.innerHTML = block.code;
+                el.draggable = true;
+                el.ondragstart = (e) => { e.dataTransfer.setData("text/plain", block.id); };
+                sourceBlocksEl.appendChild(el);
+            });
+            
+            targetBlocksArr.forEach(block => {
+                const el = document.createElement('div');
+                el.className = 'code-block';
+                el.innerHTML = block.code;
+                el.draggable = true;
+                el.ondragstart = (e) => { e.dataTransfer.setData("text/plain", block.id); };
+                targetBlocksEl.appendChild(el);
+            });
+        }
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drop(ev, toTarget) {
+            ev.preventDefault();
+            const blockId = ev.dataTransfer.getData("text/plain");
+            
+            let fromSource = sourceBlocksArr.findIndex(b => b.id === blockId);
+            let fromTarget = targetBlocksArr.findIndex(b => b.id === blockId);
+            
+            if (fromSource !== -1 && toTarget === 'target') {
+                const block = sourceBlocksArr.splice(fromSource, 1)[0];
+                targetBlocksArr.push(block);
+            } else if (fromTarget !== -1 && toTarget === 'source') {
+                const block = targetBlocksArr.splice(fromTarget, 1)[0];
+                sourceBlocksArr.push(block);
+            }
+            punishmentFeedbackEl.innerText = "";
+            renderPunishmentBlocks();
+        }
+
+        function checkPunishment() {
+            if (sourceBlocksArr.length > 0) {
+                punishmentFeedbackEl.innerText = "Gunakan semua blok!";
+                punishmentFeedbackEl.style.color = "#ffff00";
+                return;
+            }
+            
+            let isCorrect = true;
+            for(let i=0; i<activePunishment.correctOrder.length; i++) {
+                if (targetBlocksArr[i].id !== activePunishment.correctOrder[i]) {
+                    isCorrect = false;
+                    break;
+                }
+            }
+            
+            if (isCorrect) {
+                punishmentFeedbackEl.innerText = "BENAR! Nyawa kembali penuh.";
+                punishmentFeedbackEl.style.color = "#00ff66";
+                setTimeout(() => {
+                    punishmentContents.style.display = 'none';
+                    lives = 2;
+                    loadQuestion();
+                }, 1500);
+            } else {
+                punishmentFeedbackEl.innerText = "SALAH! Urutannya belum benar.";
+                punishmentFeedbackEl.style.color = "#ff2a2a";
+            }
+        }
 
         function renderLives() {
             heartsBox.innerHTML = '';
             for(let i=0; i<lives; i++) {
                 heartsBox.innerHTML += '<span class="pixel-heart">❤️</span>';
+            }
+        }
+
+        function updateCounterDisplay() {
+            const current = quizData[currentIdx];
+            if (current.requiredSequence.length > 1) {
+                counterTextEl.style.display = 'block';
+                counterTextEl.innerText = `PROGRESS: ${currentSequenceStep} / ${current.requiredSequence.length}`;
+            } else {
+                counterTextEl.style.display = 'none';
             }
         }
 
@@ -318,6 +614,7 @@
             // Reset visual layar
             document.body.classList.remove('correct-flash');
             document.body.classList.remove('wrong-flash');
+            wrongPopup.classList.remove('show');
             quizSlider.style.transform = 'translateX(0)';
             quizSlider.style.opacity = '1';
             
@@ -332,6 +629,8 @@
             codeTextEl.innerHTML = current.code;
             instructionTextEl.innerText = current.hint;
             
+            currentSequenceStep = 0;
+            updateCounterDisplay();
             isLockingInput = false;
         }
 
@@ -343,33 +642,51 @@
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
 
             const current = quizData[currentIdx];
+            const expectedDirection = current.requiredSequence[currentSequenceStep];
 
-            if (e.key === current.requiredDirection) {
-                isLockingInput = true; 
+            if (e.key === expectedDirection) {
+                currentSequenceStep++;
+                updateCounterDisplay();
                 
-                // Efek transisi sukses (Lampu hijau flash & slide)
-                document.body.classList.remove('wrong-flash');
-                document.body.classList.add('correct-flash');
-                
-                // Geser ke arah yang benar
-                if (e.key === 'ArrowRight') {
-                    quizSlider.style.transform = 'translateX(100vw)';
-                } else {
-                    quizSlider.style.transform = 'translateX(-100vw)';
+                // Efek getar kecil menandakan input benar jika masih ada sisa gerakan
+                if (currentSequenceStep < current.requiredSequence.length) {
+                    quizSlider.style.transform = `translateX(${e.key === 'ArrowRight' ? 20 : -20}px)`;
+                    setTimeout(() => { if (!isLockingInput) quizSlider.style.transform = 'translateX(0)'; }, 150);
                 }
+                
+                if (currentSequenceStep === current.requiredSequence.length) {
+                    isLockingInput = true; 
+                    
+                    // Efek transisi sukses (Lampu hijau flash & slide)
+                    document.body.classList.remove('wrong-flash');
+                    document.body.classList.add('correct-flash');
+                    
+                    // Geser ke arah gestur terakhir
+                    if (e.key === 'ArrowRight') {
+                        quizSlider.style.transform = 'translateX(100vw)';
+                    } else {
+                        quizSlider.style.transform = 'translateX(-100vw)';
+                    }
 
-                quizSlider.style.opacity = '0';
-                score += 20; // 20 poin per soal (total max 100 poin)
+                    quizSlider.style.opacity = '0';
+                    score += 20; // 20 poin per soal
 
-                setTimeout(() => {
-                    currentIdx++;
-                    loadQuestion();
-                }, 500);
+                    setTimeout(() => {
+                        currentIdx++;
+                        loadQuestion();
+                    }, 500);
+                }
             } else {
                 // Salah gestur mengonsumsi nyawa
                 isLockingInput = true;
                 lives--;
                 renderLives();
+                
+                currentSequenceStep = 0;
+                updateCounterDisplay();
+
+                // Tampilkan Popup WRONG
+                wrongPopup.classList.add('show');
                 
                 // Lampu merah flash
                 document.body.classList.add('wrong-flash');
@@ -381,6 +698,7 @@
                     setTimeout(() => {
                         quizSlider.style.transform = 'translateX(0)';
                         document.body.classList.remove('wrong-flash');
+                        wrongPopup.classList.remove('show');
                         if(lives <= 0) {
                             showResult(false);
                         } else {
@@ -393,22 +711,21 @@
 
         function showResult(win) {
             quizContents.style.display = 'none';
-            resultContents.style.display = 'block';
-            finalScoreEl.innerText = score;
-
             if (win) {
+                resultContents.style.display = 'block';
+                finalScoreEl.innerText = score;
                 resultStatusEl.innerText = "ALL STAGE CLEAR!";
                 resultStatusEl.style.color = "#00ff66";
             } else {
-                resultStatusEl.innerText = "GAME OVER";
-                resultStatusEl.style.color = "#ff2a6d";
+                // Kalah -> Jalankan hukuman
+                startPunishment();
             }
         }
 
         function resetGame() {
             currentIdx = 0;
             score = 0;
-            lives = 6;
+            lives = 2;
             loadQuestion();
         }
 
