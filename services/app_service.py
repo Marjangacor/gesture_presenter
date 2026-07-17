@@ -5,7 +5,7 @@ listener). Everything else stays decoupled and only talks through
 signals — this is what MainWindow's Start/Stop buttons call into.
 """
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from vision.camera_worker import CameraWorker
@@ -18,6 +18,10 @@ from overlay.floating_menu import FloatingMenuButton
 
 
 class AppService(QObject):
+    gesture_detected = Signal(str, bool)
+    swipe_right = Signal()
+    swipe_left = Signal()
+
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self.settings = settings
@@ -116,6 +120,11 @@ class AppService(QObject):
         ge.radial_menu_selection_changed.connect(self._on_radial_menu_selection_changed)
         ge.radial_menu_hover_progress.connect(self._on_radial_menu_hover_progress)
         
+        # Live feedback signal forwarding
+        ge.gesture_detected.connect(self.gesture_detected.emit)
+        ge.swipe_right.connect(self.swipe_right.emit)
+        ge.swipe_left.connect(self.swipe_left.emit)
+
         # Presentation Mode signals
         ge.presentation_mode_entered.connect(self._on_presentation_entered)
         ge.presentation_mode_exited.connect(self._on_presentation_exited)
@@ -172,11 +181,25 @@ class AppService(QObject):
         if self.overlay:
             self.overlay.hide()
 
+    def _execute_action(self, action: str):
+        if action == "Next Slide":
+            self.keyboard_controller.press_right_arrow()
+        elif action == "Previous Slide":
+            self.keyboard_controller.press_left_arrow()
+
     def _on_swipe_right(self):
-        self.keyboard_controller.press_right_arrow()
+        g_settings = self.settings.get("gesture_settings", {})
+        cfg = g_settings.get("swipe_right", {})
+        if cfg.get("enabled", True):
+            action = cfg.get("action", "Next Slide")
+            self._execute_action(action)
 
     def _on_swipe_left(self):
-        self.keyboard_controller.press_left_arrow()
+        g_settings = self.settings.get("gesture_settings", {})
+        cfg = g_settings.get("swipe_left", {})
+        if cfg.get("enabled", True):
+            action = cfg.get("action", "Previous Slide")
+            self._execute_action(action)
 
     def _on_swipe_up(self):
         self.keyboard_controller.press_up_arrow()

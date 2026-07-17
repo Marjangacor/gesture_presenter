@@ -71,6 +71,9 @@ class GestureEngine(QObject):
     mouse_clicked = Signal()             # kept for compatibility but unused
     mouse_pressed = Signal()             # fired on pinch START (hold left button)
     mouse_released = Signal()            # fired on pinch END   (release left button)
+    
+    # Live detection feedback
+    gesture_detected = Signal(str, bool)
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -103,9 +106,45 @@ class GestureEngine(QObject):
         self._swipe_down_start_time = None
 
     def _reload_settings(self):
-        self.hold_duration = self.settings.get("activation_hold_seconds", 1.0)
         self.cooldown_duration = self.settings.get("cooldown_seconds", 1.0)
-        self.swipe_threshold = self.settings.get("swipe_distance_threshold", 0.15)
+
+        # Read gesture_settings block
+        g_settings = self.settings.get("gesture_settings", {})
+
+        # 1. Open Palm (Activation hold)
+        op_cfg = g_settings.get("open_palm", {})
+        if op_cfg.get("enabled", True):
+            op_sens = op_cfg.get("sensitivity", 70)
+            self.hold_duration = 3.2 - (op_sens / 100.0) * 3.0
+        else:
+            self.hold_duration = 999999.0
+
+        # 2. Closed Fist (Window switch hold)
+        fist_cfg = g_settings.get("closed_fist", {})
+        if fist_cfg.get("enabled", True):
+            fist_sens = fist_cfg.get("sensitivity", 70)
+            self.fist_hold_duration = 2.2 - (fist_sens / 100.0) * 2.0
+        else:
+            self.fist_hold_duration = 999999.0
+
+        # 3. Swipe Right
+        sr_cfg = g_settings.get("swipe_right", {})
+        if sr_cfg.get("enabled", True):
+            sr_sens = sr_cfg.get("sensitivity", 70)
+            self.swipe_right_threshold = 0.35 - (sr_sens / 100.0) * 0.30
+        else:
+            self.swipe_right_threshold = 999999.0
+
+        # 4. Swipe Left
+        sl_cfg = g_settings.get("swipe_left", {})
+        if sl_cfg.get("enabled", True):
+            sl_sens = sl_cfg.get("sensitivity", 70)
+            self.swipe_left_threshold = 0.35 - (sl_sens / 100.0) * 0.30
+        else:
+            self.swipe_left_threshold = 999999.0
+
+        # Fallback general threshold
+        self.swipe_threshold = min(self.swipe_right_threshold, self.swipe_left_threshold)
 
     # ---------------------------------------------------------
     # Public API
@@ -119,6 +158,14 @@ class GestureEngine(QObject):
         """Called for every camera frame with the detected hand (or None)."""
         if not self.enabled:
             return
+
+        # Emit live detection status for settings UI feedback
+        if landmarks:
+            self.gesture_detected.emit("open_palm", is_open_palm(landmarks))
+            self.gesture_detected.emit("closed_fist", is_fist(landmarks))
+        else:
+            self.gesture_detected.emit("open_palm", False)
+            self.gesture_detected.emit("closed_fist", False)
 
         now = time.time()
         if now < self._cooldown_until:
@@ -172,7 +219,7 @@ class GestureEngine(QObject):
         if is_fist(landmarks) and self._active_mode == 1:
             if self._fist_hold_start is None:
                 self._fist_hold_start = now
-            elif now - self._fist_hold_start >= FIST_CONFIRM_SECONDS:
+            elif now - self._fist_hold_start >= self.fist_hold_duration:
                 self._enter_window_switch_mode()
             return
         else:
@@ -411,7 +458,15 @@ class GestureEngine(QObject):
         delta_x = cx - self._track_start_x
         delta_y = cy - self._track_start_y
 
-        if abs(delta_x) >= self.swipe_threshold or abs(delta_y) >= self.swipe_threshold:
+        # Determine threshold based on movement direction
+        if delta_x > 0:
+            x_threshold = self.swipe_right_threshold
+        else:
+            x_threshold = self.swipe_left_threshold
+
+        y_threshold = self.swipe_threshold
+
+        if abs(delta_x) >= x_threshold or abs(delta_y) >= y_threshold:
             self._track_start_x = None
             self._track_start_y = None
             self._track_start_time = None
