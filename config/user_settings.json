@@ -1,15 +1,38 @@
 {
     "camera_index": 0,
-    "detection_confidence": 0.1,
-    "activation_hold_seconds": 0.5,
-    "cooldown_seconds": 0.1,
-    "swipe_distance_threshold": 0.15,
+    "detection_confidence": 0.7,
+    "activation_hold_seconds": 1.0,
+    "radial_menu_hold_seconds": 5.0,
+    "cooldown_seconds": 1.0,
+    "swipe_distance_threshold": 0.07,
     "hotkeys": {
-        "toggle_gesture_control": "A"
+        "toggle_gesture_control": "f8"
     },
     "overlay": {
         "enabled": true,
-        "radius": 30,
-        "opacity": 0.65
+        "radius": 20,
+        "opacity": 0.5
+    },
+    "gesture_settings": {
+        "swipe_right": {
+            "enabled": true,
+            "action": "Next Slide",
+            "sensitivity": 70
+        },
+        "swipe_left": {
+            "enabled": true,
+            "action": "Previous Slide",
+            "sensitivity": 70
+        },
+        "open_palm": {
+            "enabled": true,
+            "action": "Activate Presentation",
+            "sensitivity": 70
+        },
+        "closed_fist": {
+            "enabled": true,
+            "action": "Window Switcher",
+            "sensitivity": 70
+        }
     }
 }

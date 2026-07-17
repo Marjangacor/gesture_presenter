@@ -12,5 +12,27 @@
         "enabled": true,
         "radius": 20,
         "opacity": 0.5
+    },
+    "gesture_settings": {
+        "swipe_right": {
+            "enabled": true,
+            "action": "Next Slide",
+            "sensitivity": 70
+        },
+        "swipe_left": {
+            "enabled": true,
+            "action": "Previous Slide",
+            "sensitivity": 70
+        },
+        "open_palm": {
+            "enabled": true,
+            "action": "Activate Presentation",
+            "sensitivity": 70
+        },
+        "closed_fist": {
+            "enabled": true,
+            "action": "Window Switcher",
+            "sensitivity": 70
+        }
     }
 }
