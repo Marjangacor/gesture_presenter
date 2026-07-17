@@ -3,13 +3,13 @@
     "detection_confidence": 0.1,
     "activation_hold_seconds": 0.5,
     "cooldown_seconds": 0.1,
-    "swipe_distance_threshold": 0.05,
+    "swipe_distance_threshold": 0.15,
     "hotkeys": {
-        "toggle_gesture_control": "f8"
+        "toggle_gesture_control": "A"
     },
     "overlay": {
         "enabled": true,
-        "radius": 26,
+        "radius": 30,
         "opacity": 0.65
     }
 }

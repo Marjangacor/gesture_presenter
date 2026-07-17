@@ -14,6 +14,7 @@ from controller.keyboard_controller import KeyboardController
 from controller.hotkey_listener import HotkeyListener
 from overlay.overlay_window import OverlayWindow
 from overlay.radial_menu import RadialMenuWindow
+from overlay.floating_menu import FloatingMenuButton
 
 
 class AppService(QObject):
@@ -26,6 +27,7 @@ class AppService(QObject):
         self.keyboard_controller = KeyboardController()
         self.overlay = None
         self.radial_menu = None
+        self.floating_menu = None
         self.hotkey_listener = None
 
         self._gesture_enabled = False
@@ -57,6 +59,9 @@ class AppService(QObject):
         )
         
         self.radial_menu = RadialMenuWindow()
+        
+        self.floating_menu = FloatingMenuButton()
+        self.floating_menu.menu_clicked.connect(self.gesture_engine.open_radial_menu)
 
         hotkey = self.settings.get("hotkeys", {}).get("toggle_gesture_control", "f8")
         self.hotkey_listener = HotkeyListener(hotkey)
@@ -82,6 +87,10 @@ class AppService(QObject):
         if self.radial_menu:
             self.radial_menu.hide()
             self.radial_menu = None
+            
+        if self.floating_menu:
+            self.floating_menu.hide()
+            self.floating_menu = None
 
         self.gesture_engine = None
         self._gesture_enabled = False
@@ -95,6 +104,8 @@ class AppService(QObject):
                 self.overlay.hide()
             if self.radial_menu:
                 self.radial_menu.hide()
+            if self.floating_menu:
+                self.floating_menu.hide()
 
     def _connect_gesture_signals(self):
         ge = self.gesture_engine
@@ -103,6 +114,7 @@ class AppService(QObject):
         ge.radial_menu_entered.connect(self._on_radial_menu_entered)
         ge.radial_menu_exited.connect(self._on_radial_menu_exited)
         ge.radial_menu_selection_changed.connect(self._on_radial_menu_selection_changed)
+        ge.radial_menu_hover_progress.connect(self._on_radial_menu_hover_progress)
         
         # Presentation Mode signals
         ge.presentation_mode_entered.connect(self._on_presentation_entered)
@@ -118,13 +130,15 @@ class AppService(QObject):
         ge.mouse_control_entered.connect(self._on_mouse_control_entered)
         ge.mouse_control_exited.connect(self._on_mouse_control_exited)
         ge.mouse_moved.connect(self._on_mouse_moved)
-        ge.mouse_clicked.connect(self._on_mouse_clicked)
+        ge.mouse_pressed.connect(self._on_mouse_pressed)
+        ge.mouse_released.connect(self._on_mouse_released)
 
     # ---------------------------------------------------------
     # Radial Menu handlers (new)
     # ---------------------------------------------------------
-    def _on_radial_menu_entered(self):
+    def _on_radial_menu_entered(self, active_index: int):
         if self.radial_menu:
+            self.radial_menu.set_active_index(active_index)
             self.radial_menu.show_in_center()
             
     def _on_radial_menu_exited(self):
@@ -134,6 +148,10 @@ class AppService(QObject):
     def _on_radial_menu_selection_changed(self, index: int):
         if self.radial_menu:
             self.radial_menu.set_hovered_index(index)
+
+    def _on_radial_menu_hover_progress(self, progress: float):
+        if self.radial_menu:
+            self.radial_menu.set_hover_progress(progress)
 
     # ---------------------------------------------------------
     # Presentation Mode handlers (unchanged)
@@ -174,16 +192,23 @@ class AppService(QObject):
     # Mouse Control Mode handlers (new)
     # ---------------------------------------------------------
     def _on_mouse_control_entered(self):
-        """Hide the overlay and reset EMA when Mouse Control Mode starts."""
+        """Hide the overlay and show floating menu when Mouse Control Mode starts."""
         if self.overlay:
             self.overlay.hide()
+        if self.floating_menu:
+            self.floating_menu.show_in_bottom_center()
         self._mouse_ema_x = None
         self._mouse_ema_y = None
 
     def _on_mouse_control_exited(self):
-        """Clean up EMA state when Mouse Control Mode ends."""
-        self._mouse_ema_x = None
-        self._mouse_ema_y = None
+        """Clean up when Mouse Control Mode ends.
+        Release the mouse button in case it was held (safety measure).
+        Hide floating menu.
+        EMA is intentionally preserved for smooth re-entry.
+        """
+        if self.floating_menu:
+            self.floating_menu.hide()
+        self.keyboard_controller.mouse_left_release()
 
     def _on_mouse_moved(self, norm_x: float, norm_y: float):
         """Convert normalized finger-tip coords to screen pixels and move mouse.
@@ -191,9 +216,28 @@ class AppService(QObject):
         Uses EMA smoothing to reduce jitter.  norm_x / norm_y come from
         MediaPipe (0.0 = left/top, 1.0 = right/bottom).
         """
-        screen = QApplication.primaryScreen().geometry()
-        raw_x = norm_x * screen.width()
-        raw_y = norm_y * screen.height()
+        screen = QApplication.primaryScreen()
+        # pynput expects absolute physical pixels, but PySide might return scaled logical pixels.
+        # Multiply by devicePixelRatio to get the true screen bounds.
+        ratio = screen.devicePixelRatio()
+        phys_width = screen.geometry().width() * ratio
+        phys_height = screen.geometry().height() * ratio
+        
+        # Apply sensitivity modifier. 
+        # A value of 1.0 means full camera frame = full screen.
+        # A value of 2.0 means moving hand halfway across camera reaches edge of screen.
+        sensitivity = self.settings.get("mouse_sensitivity", 1.8)
+        
+        # Scale the coordinates around the center point (0.5, 0.5)
+        scaled_x = (norm_x - 0.5) * sensitivity + 0.5
+        scaled_y = (norm_y - 0.5) * sensitivity + 0.5
+        
+        raw_x = scaled_x * phys_width
+        raw_y = scaled_y * phys_height
+        
+        # Clamp to physical screen bounds
+        raw_x = max(0, min(phys_width, raw_x))
+        raw_y = max(0, min(phys_height, raw_y))
 
         if self._mouse_ema_x is None:
             # First sample: seed the filter
@@ -208,6 +252,10 @@ class AppService(QObject):
             int(self._mouse_ema_x), int(self._mouse_ema_y)
         )
 
-    def _on_mouse_clicked(self):
-        """Fire a single left click (edge-triggered from GestureEngine)."""
-        self.keyboard_controller.mouse_left_click()
+    def _on_mouse_pressed(self):
+        """Start holding the left mouse button (pinch gesture started)."""
+        self.keyboard_controller.mouse_left_press()
+
+    def _on_mouse_released(self):
+        """Release the left mouse button (pinch gesture ended)."""
+        self.keyboard_controller.mouse_left_release()

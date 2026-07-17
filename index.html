@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Time - Pemrograman Dasar Easy</title>
+    <!-- Font Pixel Art dari Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-purple: #2c1654;
+            --text-pink: #ff00ff;
+            --text-white: #ffffff;
+            --bubble-pink: #ffb7fa;
+            --bubble-bg: rgba(44, 22, 84, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'VT323', monospace;
+            background-color: var(--bg-purple);
+            color: var(--text-white);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            transition: background-color 0.3s ease;
+            
+            /* Latar belakang awan pixelated */
+            background-image: 
+                radial-gradient(circle at 15% 25%, #3d2273 8%, transparent 8.5%),
+                radial-gradient(circle at 85% 20%, #3d2273 12%, transparent 12.5%),
+                radial-gradient(circle at 50% 80%, #3d2273 10%, transparent 10.5%);
+            background-size: 100% 100%;
+        }
+
+        /* Dekorasi Tanah Pixel */
+        body::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(45deg, #4c2885 25%, transparent 25%), 
+                        linear-gradient(-45deg, #4c2885 25%, transparent 25%);
+            background-size: 30px 30px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Kontainer Utama Full Screen */
+        .game-screen {
+            width: 100vw;
+            height: 100vh;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            z-index: 10;
+            overflow: hidden;
+        }
+
+        /* Barisan Atas: Nyawa Hati di Tengah */
+        .top-bar {
+            display: flex;
+            justify-content: space-between; 
+            align-items: center;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .lives-container {
+            display: flex;
+            gap: 12px;
+        }
+
+        .pixel-heart {
+            font-size: 2.5rem;
+            color: #ff2a2a;
+            text-shadow: 3px 3px 0px #000000;
+            animation: pulse 1s infinite alternate;
+        }
+
+        /* Progress Stage */
+        .stage-indicator {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.2rem;
+            color: #ffff00;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        /* Judul Kuis */
+        .quiz-title {
+            font-family: 'Press Start 2P', monospace;
+            text-align: center;
+            font-size: 3rem;
+            color: var(--text-pink);
+            text-shadow: 5px 5px 0px #000000;
+            margin-top: 10px;
+            letter-spacing: 4px;
+        }
+        .quiz-title span {
+            color: #00ffff;
+        }
+
+        /* Pembungkus Blok Kode Soal */
+        .slider-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+            width: 100%;
+        }
+
+        /* Tampilan Blok Kode (Code Box) ala Programmer */
+        .code-box {
+            background-color: #1a0c36;
+            border: 4px solid var(--bubble-pink);
+            border-radius: 15px;
+            padding: 25px 30px;
+            width: 85%;
+            max-width: 850px;
+            font-family: monospace;
+            font-size: 2.2rem;
+            color: #00ff66;
+            box-shadow: 8px 8px 0px #000000;
+            margin-bottom: 20px;
+            text-align: left;
+            line-height: 1.4;
+            overflow-x: auto;
+        }
+
+        .code-keyword { color: #ff00ff; }
+        .code-string { color: #ffff00; }
+        .code-comment { color: #7a7a7a; }
+
+        /* Teks Perintah Input di Bawah Kode */
+        .instruction-box {
+            font-size: 2rem;
+            text-align: center;
+            color: #00ffff;
+            text-shadow: 2px 2px 0px #000000;
+            margin-top: 10px;
+        }
+
+        /* Status Hit Penghitung Gestur Aktif */
+        .counter-box {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.4rem;
+            color: #ffff00;
+            margin-top: 15px;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        /* Layar Hasil Akhir */
+        .result-screen {
+            display: none;
+            text-align: center;
+            margin: auto;
+        }
+
+        .result-banner {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 2.5rem;
+            color: #00ffff;
+            text-shadow: 4px 4px 0px #000;
+            margin-bottom: 40px;
+        }
+
+        .score-box {
+            font-size: 4rem;
+            color: #ffff00;
+            margin-bottom: 50px;
+            text-shadow: 3px 3px 0px #000;
+        }
+
+        .restart-btn {
+            font-family: 'Press Start 2P', monospace;
+            background: #ff00ff;
+            color: #fff;
+            border: 5px solid #fff;
+            padding: 20px 40px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            box-shadow: 6px 6px 0px #000;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        /* Kelas Efek khusus untuk layar ketika Benar (Hijau) */
+        .correct-flash {
+            background-color: #004d1a !important;
+            background-image: none !important;
+        }
+
+        /* Kelas Efek khusus untuk layar ketika Salah (Merah) */
+        .wrong-flash {
+            background-color: #4d0000 !important;
+            background-image: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-screen">
+        
+        <!-- AREA UTAMA PERMAINAN -->
+        <div id="quiz-contents" style="display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
+            <div class="top-bar">
+                <div class="stage-indicator" id="stage-text">STAGE 1 / 10</div>
+                <div class="lives-container" id="hearts-box"></div>
+            </div>
+
+            <div class="quiz-title">QUIZ<br><span>TIME</span></div>
+
+            <!-- Kontainer utama yang akan bergeser secara fisik ke kanan mengikuti gestur tangan -->
+            <div class="slider-container" id="quiz-slider">
+                <!-- Blok Kode Program Pemrograman Dasar -->
+                <div class="code-box" id="code-text"></div>
+                
+                <!-- Petunjuk Perintah -->
+                <div class="instruction-box" id="instruction-text">Jalankan output kode di atas dengan gestur tangan!</div>
+            </div>
+
+            <!-- Space Bawah kosong rapi -->
+            <div></div>
+        </div>
+
+        <!-- AREA SKOR GAME OVER / WIN -->
+        <div class="result-screen" id="result-contents">
+            <div class="result-banner" id="result-status">GAME OVER</div>
+            <div class="score-box">SCORE: <span id="final-score">0</span></div>
+            <button class="restart-btn" onclick="resetGame()">CONTINUE?</button>
+        </div>
+
+    </div>
+
+    <script>
+        // Logika Soal: Total 5 Soal dengan materi Python dasar!
+        const quizData = [
+            {
+                code: `<span class="code-keyword">print</span>(<span class="code-string">"Kiri"</span>)`,
+                requiredDirection: "ArrowLeft",
+                hint: "Output: Kiri (Geser Kiri)"
+            },
+            {
+                code: `<span class="code-keyword">teks</span> = <span class="code-string">"Kanan"</span><br><span class="code-keyword">print</span>(teks)`,
+                requiredDirection: "ArrowRight",
+                hint: "Output: Kanan (Geser Kanan)"
+            },
+            {
+                code: `<span class="code-keyword">if</span> 10 &gt; 5:<br>&nbsp;&nbsp;<span class="code-keyword">print</span>(<span class="code-string">"Kiri"</span>)<br><span class="code-keyword">else</span>:<br>&nbsp;&nbsp;<span class="code-keyword">print</span>(<span class="code-string">"Kanan"</span>)`,
+                requiredDirection: "ArrowLeft",
+                hint: "10 lebih besar dari 5, jadi? (Geser Kiri/Kanan)"
+            },
+            {
+                code: `<span class="code-keyword">buah</span> = [<span class="code-string">"Apel"</span>, <span class="code-string">"Kanan"</span>]<br><span class="code-keyword">print</span>(buah[1])`,
+                requiredDirection: "ArrowRight",
+                hint: "Indeks 1 pada Python adalah elemen ke-2! (Geser Kiri/Kanan)"
+            },
+            {
+                code: `<span class="code-keyword">def</span> <span class="code-string">arah</span>():<br>&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-string">"Kiri"</span><br><br><span class="code-keyword">print</span>(arah())`,
+                requiredDirection: "ArrowLeft",
+                hint: "Fungsi arah() mengembalikan nilai apa? (Geser Kiri/Kanan)"
+            }
+        ];
+
+        let currentIdx = 0;
+        let score = 0;
+        let lives = 6; 
+        let isLockingInput = false; 
+
+        const quizContents = document.getElementById('quiz-contents');
+        const resultContents = document.getElementById('result-contents');
+        const codeTextEl = document.getElementById('code-text');
+        const instructionTextEl = document.getElementById('instruction-text');
+        const stageTextEl = document.getElementById('stage-text');
+        const heartsBox = document.getElementById('hearts-box');
+        const finalScoreEl = document.getElementById('final-score');
+        const resultStatusEl = document.getElementById('result-status');
+        const quizSlider = document.getElementById('quiz-slider');
+
+        function renderLives() {
+            heartsBox.innerHTML = '';
+            for(let i=0; i<lives; i++) {
+                heartsBox.innerHTML += '<span class="pixel-heart">❤️</span>';
+            }
+        }
+
+        function loadQuestion() {
+            if (lives <= 0) {
+                showResult(false);
+                return;
+            }
+            if (currentIdx >= quizData.length) {
+                showResult(true);
+                return;
+            }
+
+            // Reset visual layar
+            document.body.classList.remove('correct-flash');
+            document.body.classList.remove('wrong-flash');
+            quizSlider.style.transform = 'translateX(0)';
+            quizSlider.style.opacity = '1';
+            
+            quizContents.style.display = 'flex';
+            resultContents.style.display = 'none';
+            renderLives();
+
+            // Set progress stage di pojok kiri atas
+            stageTextEl.innerText = `STAGE ${currentIdx + 1} / ${quizData.length}`;
+
+            const current = quizData[currentIdx];
+            codeTextEl.innerHTML = current.code;
+            instructionTextEl.innerText = current.hint;
+            
+            isLockingInput = false;
+        }
+
+        // TANGKAPAN SENSOR UTAMA (Emulasi ArrowRight & ArrowLeft)
+        window.addEventListener('keydown', function(e) {
+            if (isLockingInput || lives <= 0 || currentIdx >= quizData.length) return;
+
+            // Hanya respon tombol kiri atau kanan
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+            const current = quizData[currentIdx];
+
+            if (e.key === current.requiredDirection) {
+                isLockingInput = true; 
+                
+                // Efek transisi sukses (Lampu hijau flash & slide)
+                document.body.classList.remove('wrong-flash');
+                document.body.classList.add('correct-flash');
+                
+                // Geser ke arah yang benar
+                if (e.key === 'ArrowRight') {
+                    quizSlider.style.transform = 'translateX(100vw)';
+                } else {
+                    quizSlider.style.transform = 'translateX(-100vw)';
+                }
+
+                quizSlider.style.opacity = '0';
+                score += 20; // 20 poin per soal (total max 100 poin)
+
+                setTimeout(() => {
+                    currentIdx++;
+                    loadQuestion();
+                }, 500);
+            } else {
+                // Salah gestur mengonsumsi nyawa
+                isLockingInput = true;
+                lives--;
+                renderLives();
+                
+                // Lampu merah flash
+                document.body.classList.add('wrong-flash');
+                
+                // Efek getar kesalahan (Shake)
+                quizSlider.style.transform = 'translateX(-20px)';
+                setTimeout(() => {
+                    quizSlider.style.transform = 'translateX(20px)';
+                    setTimeout(() => {
+                        quizSlider.style.transform = 'translateX(0)';
+                        document.body.classList.remove('wrong-flash');
+                        if(lives <= 0) {
+                            showResult(false);
+                        } else {
+                            isLockingInput = false;
+                        }
+                    }, 200);
+                }, 100);
+            }
+        });
+
+        function showResult(win) {
+            quizContents.style.display = 'none';
+            resultContents.style.display = 'block';
+            finalScoreEl.innerText = score;
+
+            if (win) {
+                resultStatusEl.innerText = "ALL STAGE CLEAR!";
+                resultStatusEl.style.color = "#00ff66";
+            } else {
+                resultStatusEl.innerText = "GAME OVER";
+                resultStatusEl.style.color = "#ff2a6d";
+            }
+        }
+
+        function resetGame() {
+            currentIdx = 0;
+            score = 0;
+            lives = 6;
+            loadQuestion();
+        }
+
+        loadQuestion();
+    </script>
+</body>
+</html>

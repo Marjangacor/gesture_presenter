@@ -1,6 +1,6 @@
 import math
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QFont
+from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QFont, QConicalGradient
 from PySide6.QtWidgets import QWidget, QApplication
 
 
@@ -29,6 +29,8 @@ class RadialMenuWindow(QWidget):
             "Presentasi",
         ]
         self.hovered_index = -1
+        self.active_index = 1
+        self.hover_progress = 0.0  # 0.0..1.0 fill for hold-to-select
         self.center_x = self.width() / 2
         self.center_y = self.height() / 2
 
@@ -36,6 +38,14 @@ class RadialMenuWindow(QWidget):
         if self.hovered_index != index:
             self.hovered_index = index
             self.update()
+
+    def set_active_index(self, index: int):
+        self.active_index = index
+        self.update()  # Always repaint when active index is set
+
+    def set_hover_progress(self, progress: float):
+        self.hover_progress = progress
+        self.update()
 
     def show_in_center(self):
         screen = QApplication.primaryScreen().geometry()
@@ -74,12 +84,38 @@ class RadialMenuWindow(QWidget):
         inner_r = self.radius * 0.3
         painter.drawEllipse(center, inner_r, inner_r)
 
+        # --- Hold-to-select progress arc ---
+        if self.hovered_index >= 0 and self.hover_progress > 0.0:
+            self._draw_progress_arc(painter, center)
+
         # --- Center label ---
         painter.setPen(QColor(255, 255, 255, 200))
         font = QFont("Arial", 8)
         painter.setFont(font)
-        label_rect = QRectF(center.x() - 30, center.y() - 10, 60, 20)
-        painter.drawText(label_rect, Qt.AlignCenter, "Pilih Mode")
+        label_rect = QRectF(center.x() - 40, center.y() - 10, 80, 20)
+        if self.hover_progress > 0:
+            secs_left = round(2.0 * (1.0 - self.hover_progress), 1)
+            center_text = f"{secs_left:.1f}s"
+        else:
+            center_text = "Tahan 2 detik"
+        painter.drawText(label_rect, Qt.AlignCenter, center_text)
+
+    def _draw_progress_arc(self, painter, center):
+        """Draw a glowing arc around the inner circle that fills up as the user holds."""
+        arc_r = self.radius * 0.32
+        arc_rect = QRectF(
+            center.x() - arc_r, center.y() - arc_r,
+            arc_r * 2, arc_r * 2
+        )
+        span_angle = int(360 * self.hover_progress) * 16
+        # Start from top (90 degrees = 12-o'clock position)
+        start_angle = 90 * 16
+
+        pen = QPen(QColor(255, 255, 80, 230), 5)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawArc(arc_rect, start_angle, span_angle)
 
     def _draw_segment(self, painter, rect, center,
                       start_16, span_16, label, index,
@@ -87,6 +123,9 @@ class RadialMenuWindow(QWidget):
         if index == self.hovered_index:
             brush = QBrush(QColor(255, 255, 255, 180))
             text_color = QColor(0, 0, 0, 255)
+        elif index == self.active_index:
+            brush = QBrush(QColor(0, 200, 100, 180)) # Green for active feature
+            text_color = QColor(255, 255, 255, 255)
         else:
             brush = QBrush(QColor(0, 0, 0, 150))
             text_color = QColor(255, 255, 255, 255)

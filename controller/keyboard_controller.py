@@ -52,3 +52,11 @@ class KeyboardController:
     def mouse_left_click(self):
         """Perform a single left mouse button click."""
         self._mouse.click(Button.left, 1)
+
+    def mouse_left_press(self):
+        """Press and hold the left mouse button (for drag operations)."""
+        self._mouse.press(Button.left)
+
+    def mouse_left_release(self):
+        """Release the left mouse button."""
+        self._mouse.release(Button.left)
